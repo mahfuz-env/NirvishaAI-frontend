@@ -1,13 +1,15 @@
 "use client";
 import { useState, useCallback, use } from "react";
 import { motion } from "framer-motion";
+import { useRouter } from "next/navigation";
+import { RefreshCw, Loader2 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import ScanProgress from "@/components/ScanProgress";
 import VulnerabilityCard from "@/components/VulnerabilityCard";
 import SecurityScore from "@/components/SecurityScore";
 import AttackSimulation from "@/components/AttackSimulation";
 import ReportDownload from "@/components/ReportDownload";
-import { getScanResult, type CheckResult, type AIVuln } from "@/lib/api";
+import { getScanResult, startScan, type CheckResult, type AIVuln } from "@/lib/api";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -15,10 +17,12 @@ interface Props {
 
 export default function ScanResultPage({ params }: Props) {
   const { id } = use(params);
+  const router = useRouter();
   const [done, setDone] = useState(false);
   const [checks, setChecks] = useState<CheckResult[]>([]);
   const [score, setScore] = useState(0);
   const [aiVulns, setAiVulns] = useState<AIVuln[]>([]);
+  const [rescanning, setRescanning] = useState(false);
 
   const handleComplete = useCallback(
     async (_checks: CheckResult[], _score: number) => {
@@ -36,6 +40,20 @@ export default function ScanResultPage({ params }: Props) {
     [id]
   );
 
+  const handleRescan = async () => {
+    setRescanning(true);
+    try {
+      // Get domain from existing result
+      const existing = await getScanResult(id);
+      const res = await startScan(existing.domain);
+      if (res.scan_id) {
+        router.push(`/scan/${res.scan_id}`);
+      }
+    } catch {
+      setRescanning(false);
+    }
+  };
+
   const failed = checks.filter((c) => !c.passed);
   const passed = checks.filter((c) => c.passed);
 
@@ -48,9 +66,25 @@ export default function ScanResultPage({ params }: Props) {
       <div className="max-w-3xl mx-auto w-full px-6 py-10 space-y-8">
 
         {/* Header */}
-        <div>
-          <h1 className="text-xl font-bold mb-1">Scan Results</h1>
-          <p className="text-xs mono text-[#888]">scan_id: {id}</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold mb-1">Scan Results</h1>
+            <p className="text-xs mono text-[#888]">scan_id: {id}</p>
+          </div>
+          {done && (
+            <button
+              onClick={handleRescan}
+              disabled={rescanning}
+              className="flex items-center gap-2 px-4 py-2 border border-[#333] hover:border-[#e63946] hover:text-[#e63946] text-[#888] rounded-lg text-sm transition-colors disabled:opacity-50"
+            >
+              {rescanning ? (
+                <Loader2 size={15} className="animate-spin" />
+              ) : (
+                <RefreshCw size={15} />
+              )}
+              Rescan
+            </button>
+          )}
         </div>
 
         {/* Live progress */}
