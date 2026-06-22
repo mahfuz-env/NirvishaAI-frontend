@@ -31,6 +31,22 @@ export default function ScanResultPage({ params }: Props) {
         setChecks(result.checks ?? []);
         setScore(result.score ?? 0);
         setAiVulns(result.ai_analysis ?? []);
+
+        // Poll for AI analysis if not ready yet
+        if (!result.ai_analysis?.length) {
+          const poll = setInterval(async () => {
+            try {
+              const updated = await getScanResult(id);
+              if (updated.ai_analysis?.length) {
+                setAiVulns(updated.ai_analysis);
+                clearInterval(poll);
+              }
+            } catch {
+              clearInterval(poll);
+            }
+          }, 5000);
+          setTimeout(() => clearInterval(poll), 120000);
+        }
       } catch {
         setChecks(_checks);
         setScore(_score);
